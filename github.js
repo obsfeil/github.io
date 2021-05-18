@@ -1,255 +1,215 @@
-console.clear();
+let renderer,
+scene,
+camera,
+sphereBg,
+nucleus,
+stars,
+controls,
+container = document.getElementById("canvas_container"),
+timeout_Debounce,
+noise = new SimplexNoise(),
+cameraSpeed = 0,
+blobScale = 3;
 
-const { gsap, imagesLoaded } = window;
 
-const buttons = {
-	prev: document.querySelector(".btn--left"),
-	next: document.querySelector(".btn--right"),
-};
-const cardsContainerEl = document.querySelector(".cards__wrapper");
-const appBgContainerEl = document.querySelector(".app__bg");
+init();
+animate();
 
-const cardInfosContainerEl = document.querySelector(".info__wrapper");
-
-buttons.next.addEventListener("click", () => swapCards("right"));
-
-buttons.prev.addEventListener("click", () => swapCards("left"));
-
-function swapCards(direction) {
-	const currentCardEl = cardsContainerEl.querySelector(".current--card");
-	const previousCardEl = cardsContainerEl.querySelector(".previous--card");
-	const nextCardEl = cardsContainerEl.querySelector(".next--card");
-
-	const currentBgImageEl = appBgContainerEl.querySelector(".current--image");
-	const previousBgImageEl = appBgContainerEl.querySelector(".previous--image");
-	const nextBgImageEl = appBgContainerEl.querySelector(".next--image");
-
-	changeInfo(direction);
-	swapCardsClass();
-
-	removeCardEvents(currentCardEl);
-
-	function swapCardsClass() {
-		currentCardEl.classList.remove("current--card");
-		previousCardEl.classList.remove("previous--card");
-		nextCardEl.classList.remove("next--card");
-
-		currentBgImageEl.classList.remove("current--image");
-		previousBgImageEl.classList.remove("previous--image");
-		nextBgImageEl.classList.remove("next--image");
-
-		currentCardEl.style.zIndex = "50";
-		currentBgImageEl.style.zIndex = "-2";
-
-		if (direction === "right") {
-			previousCardEl.style.zIndex = "20";
-			nextCardEl.style.zIndex = "30";
-
-			nextBgImageEl.style.zIndex = "-1";
-
-			currentCardEl.classList.add("previous--card");
-			previousCardEl.classList.add("next--card");
-			nextCardEl.classList.add("current--card");
-
-			currentBgImageEl.classList.add("previous--image");
-			previousBgImageEl.classList.add("next--image");
-			nextBgImageEl.classList.add("current--image");
-		} else if (direction === "left") {
-			previousCardEl.style.zIndex = "30";
-			nextCardEl.style.zIndex = "20";
-
-			previousBgImageEl.style.zIndex = "-1";
-
-			currentCardEl.classList.add("next--card");
-			previousCardEl.classList.add("current--card");
-			nextCardEl.classList.add("previous--card");
-
-			currentBgImageEl.classList.add("next--image");
-			previousBgImageEl.classList.add("current--image");
-			nextBgImageEl.classList.add("previous--image");
-		}
-	}
-}
-
-function changeInfo(direction) {
-	let currentInfoEl = cardInfosContainerEl.querySelector(".current--info");
-	let previousInfoEl = cardInfosContainerEl.querySelector(".previous--info");
-	let nextInfoEl = cardInfosContainerEl.querySelector(".next--info");
-
-	gsap.timeline()
-		.to([buttons.prev, buttons.next], {
-		duration: 0.2,
-		opacity: 0.5,
-		pointerEvents: "none",
-	})
-		.to(
-		currentInfoEl.querySelectorAll(".text"),
-		{
-			duration: 0.4,
-			stagger: 0.1,
-			translateY: "-120px",
-			opacity: 0,
-		},
-		"-="
-	)
-		.call(() => {
-		swapInfosClass(direction);
-	})
-		.call(() => initCardEvents())
-		.fromTo(
-		direction === "right"
-		? nextInfoEl.querySelectorAll(".text")
-		: previousInfoEl.querySelectorAll(".text"),
-		{
-			opacity: 0,
-			translateY: "40px",
-		},
-		{
-			duration: 0.4,
-			stagger: 0.1,
-			translateY: "0px",
-			opacity: 1,
-		}
-	)
-		.to([buttons.prev, buttons.next], {
-		duration: 0.2,
-		opacity: 1,
-		pointerEvents: "all",
-	});
-
-	function swapInfosClass() {
-		currentInfoEl.classList.remove("current--info");
-		previousInfoEl.classList.remove("previous--info");
-		nextInfoEl.classList.remove("next--info");
-
-		if (direction === "right") {
-			currentInfoEl.classList.add("previous--info");
-			nextInfoEl.classList.add("current--info");
-			previousInfoEl.classList.add("next--info");
-		} else if (direction === "left") {
-			currentInfoEl.classList.add("next--info");
-			nextInfoEl.classList.add("previous--info");
-			previousInfoEl.classList.add("current--info");
-		}
-	}
-}
-
-function updateCard(e) {
-	const card = e.currentTarget;
-	const box = card.getBoundingClientRect();
-	const centerPosition = {
-		x: box.left + box.width / 2,
-		y: box.top + box.height / 2,
-	};
-	let angle = Math.atan2(e.pageX - centerPosition.x, 0) * (35 / Math.PI);
-	gsap.set(card, {
-		"--current-card-rotation-offset": `${angle}deg`,
-	});
-	const currentInfoEl = cardInfosContainerEl.querySelector(".current--info");
-	gsap.set(currentInfoEl, {
-		rotateY: `${angle}deg`,
-	});
-}
-
-function resetCardTransforms(e) {
-	const card = e.currentTarget;
-	const currentInfoEl = cardInfosContainerEl.querySelector(".current--info");
-	gsap.set(card, {
-		"--current-card-rotation-offset": 0,
-	});
-	gsap.set(currentInfoEl, {
-		rotateY: 0,
-	});
-}
-
-function initCardEvents() {
-	const currentCardEl = cardsContainerEl.querySelector(".current--card");
-	currentCardEl.addEventListener("pointermove", updateCard);
-	currentCardEl.addEventListener("pointerout", (e) => {
-		resetCardTransforms(e);
-	});
-}
-
-initCardEvents();
-
-function removeCardEvents(card) {
-	card.removeEventListener("pointermove", updateCard);
-}
 
 function init() {
+    scene = new THREE.Scene();
 
-	let tl = gsap.timeline();
+    camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.01, 1000)
+    camera.position.set(0,0,230);
 
-	tl.to(cardsContainerEl.children, {
-		delay: 0.15,
-		duration: 0.5,
-		stagger: {
-			ease: "power4.inOut",
-			from: "right",
-			amount: 0.1,
-		},
-		"--card-translateY-offset": "0%",
-	})
-		.to(cardInfosContainerEl.querySelector(".current--info").querySelectorAll(".text"), {
-		delay: 0.5,
-		duration: 0.4,
-		stagger: 0.1,
-		opacity: 1,
-		translateY: 0,
-	})
-		.to(
-		[buttons.prev, buttons.next],
-		{
-			duration: 0.4,
-			opacity: 1,
-			pointerEvents: "all",
-		},
-		"-=0.4"
-	);
+    const directionalLight = new THREE.DirectionalLight("#fff", 2);
+    directionalLight.position.set(0, 50, -20);
+    scene.add(directionalLight);
+
+    let ambientLight = new THREE.AmbientLight("#ffffff", 1);
+    ambientLight.position.set(0, 20, 20);
+    scene.add(ambientLight);
+
+    renderer = new THREE.WebGLRenderer({
+        antialias: true,
+        alpha: true
+    });
+    renderer.setSize(container.clientWidth, container.clientHeight);
+    renderer.setPixelRatio(window.devicePixelRatio);
+    container.appendChild(renderer.domElement);
+
+    //OrbitControl
+    controls = new THREE.OrbitControls(camera, renderer.domElement);
+    controls.autoRotate = true;
+    controls.autoRotateSpeed = 4;
+    controls.maxDistance = 350;
+    controls.minDistance = 150;
+    controls.enablePan = false;
+
+    const loader = new THREE.TextureLoader();
+    const textureSphereBg = loader.load('https://i.ibb.co/4gHcRZD/bg3-je3ddz.jpg');
+    const texturenucleus = loader.load('https://i.ibb.co/hcN2qXk/star-nc8wkw.jpg');
+    const textureStar = loader.load("https://i.ibb.co/ZKsdYSz/p1-g3zb2a.png");
+    const texture1 = loader.load("https://i.ibb.co/F8by6wW/p2-b3gnym.png");  
+    const texture2 = loader.load("https://i.ibb.co/yYS2yx5/p3-ttfn70.png");
+    const texture4 = loader.load("https://i.ibb.co/yWfKkHh/p4-avirap.png");
+
+
+    /*  Nucleus  */   
+    texturenucleus.anisotropy = 16;
+    let icosahedronGeometry = new THREE.IcosahedronGeometry(30, 10);
+    let lambertMaterial = new THREE.MeshPhongMaterial({ map: texturenucleus });
+    nucleus = new THREE.Mesh(icosahedronGeometry, lambertMaterial);
+    scene.add(nucleus);
+
+
+    /*    Sphere  Background   */
+    textureSphereBg.anisotropy = 16;
+    let geometrySphereBg = new THREE.SphereBufferGeometry(150, 40, 40);
+    let materialSphereBg = new THREE.MeshBasicMaterial({
+        side: THREE.BackSide,
+        map: textureSphereBg,
+    });
+    sphereBg = new THREE.Mesh(geometrySphereBg, materialSphereBg);
+    scene.add(sphereBg);
+
+
+    /*    Moving Stars   */
+    let starsGeometry = new THREE.Geometry();
+
+    for (let i = 0; i < 50; i++) {
+        let particleStar = randomPointSphere(150); 
+
+        particleStar.velocity = THREE.MathUtils.randInt(50, 200);
+
+        particleStar.startX = particleStar.x;
+        particleStar.startY = particleStar.y;
+        particleStar.startZ = particleStar.z;
+
+        starsGeometry.vertices.push(particleStar);
+    }
+    let starsMaterial = new THREE.PointsMaterial({
+        size: 5,
+        color: "#ffffff",
+        transparent: true,
+        opacity: 0.8,
+        map: textureStar,
+        blending: THREE.AdditiveBlending,
+    });
+    starsMaterial.depthWrite = false;  
+    stars = new THREE.Points(starsGeometry, starsMaterial);
+    scene.add(stars);
+
+
+    /*    Fixed Stars   */
+    function createStars(texture, size, total) {
+        let pointGeometry = new THREE.Geometry();
+        let pointMaterial = new THREE.PointsMaterial({
+            size: size,
+            map: texture,
+            blending: THREE.AdditiveBlending,                      
+        });
+
+        for (let i = 0; i < total; i++) {
+            let radius = THREE.MathUtils.randInt(149, 70); 
+            let particles = randomPointSphere(radius);
+            pointGeometry.vertices.push(particles);
+        }
+        return new THREE.Points(pointGeometry, pointMaterial);
+    }
+    scene.add(createStars(texture1, 15, 20));   
+    scene.add(createStars(texture2, 5, 5));
+    scene.add(createStars(texture4, 7, 5));
+
+
+    function randomPointSphere (radius) {
+        let theta = 2 * Math.PI * Math.random();
+        let phi = Math.acos(2 * Math.random() - 1);
+        let dx = 0 + (radius * Math.sin(phi) * Math.cos(theta));
+        let dy = 0 + (radius * Math.sin(phi) * Math.sin(theta));
+        let dz = 0 + (radius * Math.cos(phi));
+        return new THREE.Vector3(dx, dy, dz);
+    }
 }
 
-const waitForImages = () => {
-	const images = [...document.querySelectorAll("img")];
-	const totalImages = images.length;
-	let loadedImages = 0;
-	const loaderEl = document.querySelector(".loader span");
 
-	gsap.set(cardsContainerEl.children, {
-		"--card-translateY-offset": "100vh",
-	});
-	gsap.set(cardInfosContainerEl.querySelector(".current--info").querySelectorAll(".text"), {
-		translateY: "40px",
-		opacity: 0,
-	});
-	gsap.set([buttons.prev, buttons.next], {
-		pointerEvents: "none",
-		opacity: "0",
-	});
+function animate() {
 
-	images.forEach((image) => {
-		imagesLoaded(image, (instance) => {
-			if (instance.isComplete) {
-				loadedImages++;
-				let loadProgress = loadedImages / totalImages;
+    //Stars  Animation
+    stars.geometry.vertices.forEach(function (v) {
+        v.x += (0 - v.x) / v.velocity;
+        v.y += (0 - v.y) / v.velocity;
+        v.z += (0 - v.z) / v.velocity;
 
-				gsap.to(loaderEl, {
-					duration: 1,
-					scaleX: loadProgress,
-					backgroundColor: `hsl(${loadProgress * 120}, 100%, 50%`,
-				});
+        v.velocity -= 0.3;
 
-				if (totalImages == loadedImages) {
-					gsap.timeline()
-						.to(".loading__wrapper", {
-						duration: 0.8,
-						opacity: 0,
-						pointerEvents: "none",
-					})
-						.call(() => init());
-				}
-			}
-		});
-	});
-};
+        if (v.x <= 5 && v.x >= -5 && v.z <= 5 && v.z >= -5) {
+            v.x = v.startX;
+            v.y = v.startY;
+            v.z = v.startZ;
+            v.velocity = THREE.MathUtils.randInt(50, 300);
+        }
+    });
 
-waitForImages();
+
+    //Nucleus Animation
+    nucleus.geometry.vertices.forEach(function (v) {
+        let time = Date.now();
+        v.normalize();
+        let distance = nucleus.geometry.parameters.radius + noise.noise3D(
+            v.x + time * 0.0005,
+            v.y + time * 0.0003,
+            v.z + time * 0.0008
+        ) * blobScale;
+        v.multiplyScalar(distance);
+    })
+    nucleus.geometry.verticesNeedUpdate = true;
+    nucleus.geometry.normalsNeedUpdate = true;
+    nucleus.geometry.computeVertexNormals();
+    nucleus.geometry.computeFaceNormals();
+    nucleus.rotation.y += 0.002;
+
+
+    //Sphere Beckground Animation
+    sphereBg.rotation.x += 0.002;
+    sphereBg.rotation.y += 0.002;
+    sphereBg.rotation.z += 0.002;
+
+    
+    controls.update();
+    stars.geometry.verticesNeedUpdate = true;
+    renderer.render(scene, camera);
+    requestAnimationFrame(animate);
+}
+
+
+
+/*     Resize     */
+window.addEventListener("resize", () => {
+    clearTimeout(timeout_Debounce);
+    timeout_Debounce = setTimeout(onWindowResize, 80);
+});
+function onWindowResize() {
+    camera.aspect = container.clientWidth / container.clientHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(container.clientWidth, container.clientHeight);
+}
+
+
+
+/*     Fullscreen btn     */
+let fullscreen;
+let fsEnter = document.getElementById('fullscr');
+fsEnter.addEventListener('click', function (e) {
+    e.preventDefault();
+    if (!fullscreen) {
+        fullscreen = true;
+        document.documentElement.requestFullscreen();
+        fsEnter.innerHTML = "Exit Fullscreen";
+    }
+    else {
+        fullscreen = false;
+        document.exitFullscreen();
+        fsEnter.innerHTML = "Go Fullscreen";
+    }
+});
